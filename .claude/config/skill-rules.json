@@ -1,0 +1,17 @@
+[
+  {
+    "name": "react-native-ui-helper",
+    "match": ["app/**", "components/**", "constants/**"],
+    "activation": "when editing React Native frontend or UI components"
+  },
+  {
+    "name": "backend-analyzer",
+    "match": ["database/**", "utils/**"],
+    "activation": "when editing backend logic or utility functions"
+  },
+  {
+    "name": "pvc-production-optimizer",
+    "match": ["database/**", "utils/**"],
+    "activation": "when editing files related to production or order management"
+  }
+]

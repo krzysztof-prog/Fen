@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Pomiary Okien",
+    "slug": "window-measurement-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "windowmeasurement",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#3b82f6"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Aplikacja potrzebuje dostępu do aparatu, aby robić zdjęcia okien."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Aplikacja potrzebuje dostępu do galerii, aby zapisywać zdjęcia."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.windowmeasurement",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Aplikacja potrzebuje dostępu do aparatu, aby robić zdjęcia okien.",
+        "NSPhotoLibraryUsageDescription": "Aplikacja potrzebuje dostępu do galerii, aby zapisywać zdjęcia."
+      }
+    },
+    "android": {
+      "package": "com.yourcompany.windowmeasurement",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

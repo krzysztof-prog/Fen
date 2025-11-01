@@ -49,7 +49,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
    */
   const requestCameraPermission = async (): Promise<boolean> => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    
+
     if (status !== 'granted') {
       Alert.alert(
         'Brak uprawnień',
@@ -58,7 +58,25 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
       );
       return false;
     }
-    
+
+    return true;
+  };
+
+  /**
+   * Sprawdza i żąda uprawnień do galerii
+   */
+  const requestMediaLibraryPermission = async (): Promise<boolean> => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (status !== 'granted') {
+      Alert.alert(
+        'Brak uprawnień',
+        'Aplikacja potrzebuje dostępu do galerii, aby wybrać zdjęcia.',
+        [{ text: 'OK' }]
+      );
+      return false;
+    }
+
     return true;
   };
 
@@ -79,20 +97,87 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     if (!hasPermission) return;
 
     try {
+      console.log('📷 Uruchamiam aparat...');
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
+        mediaTypes: ['images'],
+        allowsEditing: false,
         quality: 1,
       });
 
-      if (!result.canceled && result.assets[0]) {
+      console.log('📷 Wynik z aparatu:', result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        console.log('📷 Zdjęcie zrobione, URI:', result.assets[0].uri);
         await processImage(result.assets[0].uri);
+      } else {
+        console.log('📷 Użytkownik anulował robienie zdjęcia');
       }
     } catch (error) {
       console.error('❌ Błąd podczas robienia zdjęcia:', error);
-      Alert.alert('Błąd', 'Nie udało się zrobić zdjęcia');
+      Alert.alert('Błąd', `Nie udało się zrobić zdjęcia: ${error}`);
     }
+  };
+
+  /**
+   * Wybiera zdjęcie z galerii
+   */
+  const pickFromGallery = async () => {
+    if (photos.length >= maxPhotos) {
+      Alert.alert(
+        'Limit zdjęć',
+        `Możesz dodać maksymalnie ${maxPhotos} zdjęć.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const hasPermission = await requestMediaLibraryPermission();
+    if (!hasPermission) return;
+
+    try {
+      console.log('🖼️ Otwieranie galerii...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+      });
+
+      console.log('🖼️ Wynik z galerii:', result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        console.log('🖼️ Zdjęcie wybrane, URI:', result.assets[0].uri);
+        await processImage(result.assets[0].uri);
+      } else {
+        console.log('🖼️ Użytkownik anulował wybór zdjęcia');
+      }
+    } catch (error) {
+      console.error('❌ Błąd podczas wybierania zdjęcia:', error);
+      Alert.alert('Błąd', `Nie udało się wybrać zdjęcia: ${error}`);
+    }
+  };
+
+  /**
+   * Pokazuje opcje dodawania zdjęcia (aparat lub galeria)
+   */
+  const showAddPhotoOptions = () => {
+    Alert.alert(
+      'Dodaj zdjęcie',
+      'Wybierz źródło zdjęcia',
+      [
+        {
+          text: 'Aparat',
+          onPress: takePhoto,
+        },
+        {
+          text: 'Galeria',
+          onPress: pickFromGallery,
+        },
+        {
+          text: 'Anuluj',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   /**
@@ -177,7 +262,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({
     return (
       <TouchableOpacity
         style={styles.addButton}
-        onPress={takePhoto}
+        onPress={showAddPhotoOptions}
         disabled={isProcessing}
       >
         {isProcessing ? (

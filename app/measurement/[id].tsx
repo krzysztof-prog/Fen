@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeScreen } from '../../components/SafeScreen';
+import { PDFExportModal } from '../../components/PDFExportModal';
 import {
   getMeasurementById,
   deleteMeasurement,
@@ -26,11 +27,6 @@ import {
 } from '../../database/queries';
 import { MeasurementWithPhotos } from '../../database/models';
 import { COLORS, TYPOGRAPHY, SPACING, SIZES, SHADOWS, LABELS } from '../../constants/theme';
-import {
-  exportMeasurementToPDF,
-  sharePDF,
-  generatePDFFilename,
-} from '../../utils/pdfExport';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -42,7 +38,7 @@ export default function MeasurementDetailScreen() {
   const [measurement, setMeasurement] = useState<MeasurementWithPhotos | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
+  const [isPDFModalVisible, setIsPDFModalVisible] = useState(false);
 
   useEffect(() => {
     loadMeasurement();
@@ -151,30 +147,11 @@ export default function MeasurementDetailScreen() {
   };
 
   /**
-   * Eksportuje pomiar do PDF
+   * Otwiera modal podglądu PDF
    */
-  const handleExportPDF = async () => {
+  const handleExportPDF = () => {
     if (!measurement) return;
-
-    try {
-      setIsExporting(true);
-
-      // Generuj PDF
-      const pdfUri = await exportMeasurementToPDF(measurement);
-      
-      // Wygeneruj nazwę pliku
-      const filename = generatePDFFilename(measurement);
-
-      // Udostępnij PDF
-      await sharePDF(pdfUri, filename);
-
-      Alert.alert('Sukces', 'PDF został wygenerowany i udostępniony');
-    } catch (error) {
-      console.error('❌ Błąd podczas eksportu PDF:', error);
-      Alert.alert('Błąd', 'Nie udało się wygenerować PDF');
-    } finally {
-      setIsExporting(false);
-    }
+    setIsPDFModalVisible(true);
   };
 
   /**
@@ -185,13 +162,8 @@ export default function MeasurementDetailScreen() {
       <TouchableOpacity
         style={[styles.optionButton, styles.optionButtonPrimary]}
         onPress={handleExportPDF}
-        disabled={isExporting}
       >
-        {isExporting ? (
-          <ActivityIndicator color={COLORS.text.inverse} />
-        ) : (
-          <Text style={styles.optionButtonText}>📄 Eksportuj do PDF</Text>
-        )}
+        <Text style={styles.optionButtonText}>📄 Eksportuj do PDF</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -448,6 +420,12 @@ export default function MeasurementDetailScreen() {
       </ScrollView>
 
       {renderPhotoModal()}
+
+      <PDFExportModal
+        visible={isPDFModalVisible}
+        measurement={measurement}
+        onClose={() => setIsPDFModalVisible(false)}
+      />
     </SafeScreen>
   );
 }

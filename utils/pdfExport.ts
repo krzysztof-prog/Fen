@@ -4,8 +4,10 @@
  */
 
 import * as Print from 'expo-print';
-import * as FileSystem from 'expo-file-system';
+import { Paths, File } from 'expo-file-system';
 import { Alert, Platform } from 'react-native';
+import * as MailComposer from 'expo-mail-composer';
+import * as Sharing from 'expo-sharing';
 import { MeasurementWithPhotos } from '../database/models';
 import { LABELS } from '../constants/theme';
 
@@ -107,7 +109,7 @@ const generateMeasurementHTML = (measurement: MeasurementWithPhotos): string => 
 /**
  * Generuje kompletny dokument HTML dla PDF
  */
-const generatePDFHTML = (
+export const generatePDFHTML = (
   measurements: MeasurementWithPhotos[],
   title: string = 'Pomiary Okien'
 ): string => {
@@ -396,17 +398,15 @@ export const sharePDF = async (
 ): Promise<void> => {
   try {
     // Skopiuj plik do katalogu dokumentów z odpowiednią nazwą
-    const newUri = `${FileSystem.documentDirectory}${filename}`;
-    await FileSystem.copyAsync({
-      from: pdfUri,
-      to: newUri,
-    });
+    const targetFile = new File(Paths.document, filename);
+    const sourceFile = new File(pdfUri);
+    await sourceFile.copy(targetFile);
 
     // Pokaż użytkownikowi gdzie zapisano plik
     if (Platform.OS === 'android') {
       Alert.alert(
         'PDF zapisany',
-        `Plik został zapisany:\n${newUri}\n\nMożesz go znaleźć w menedżerze plików.`,
+        `Plik został zapisany:\n${targetFile.uri}\n\nMożesz go znaleźć w menedżerze plików.`,
         [{ text: 'OK' }]
       );
     } else {
@@ -417,7 +417,7 @@ export const sharePDF = async (
       );
     }
 
-    console.log('✅ PDF zapisany:', newUri);
+    console.log('✅ PDF zapisany:', targetFile.uri);
   } catch (error) {
     console.error('❌ Błąd podczas zapisywania PDF:', error);
     throw new Error('Nie udało się zapisać PDF');
@@ -435,24 +435,18 @@ export const savePDFToFiles = async (
   filename: string
 ): Promise<string> => {
   try {
-    // Ścieżka do katalogu dokumentów
-    const documentsDir = `${FileSystem.documentDirectory}pomiary/`;
+    // Skopiuj plik do katalogu dokumentów
+    const targetFile = new File(Paths.document, 'pomiary', filename);
+    const sourceFile = new File(pdfUri);
 
     // Utwórz katalog jeśli nie istnieje
-    const dirInfo = await FileSystem.getInfoAsync(documentsDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(documentsDir, { intermediates: true });
-    }
+    await targetFile.parentDirectory.create();
 
     // Skopiuj plik
-    const newUri = `${documentsDir}${filename}`;
-    await FileSystem.copyAsync({
-      from: pdfUri,
-      to: newUri,
-    });
+    await sourceFile.copy(targetFile);
 
-    console.log('✅ PDF zapisany:', newUri);
-    return newUri;
+    console.log('✅ PDF zapisany:', targetFile.uri);
+    return targetFile.uri;
   } catch (error) {
     console.error('❌ Błąd podczas zapisywania PDF:', error);
     throw new Error('Nie udało się zapisać PDF');
@@ -479,4 +473,84 @@ export const generatePDFFilename = (measurement: MeasurementWithPhotos): string 
 export const generateMultiplePDFFilename = (count: number): string => {
   const date = new Date().toISOString().split('T')[0];
   return `pomiary-okien-${count}-${date}.pdf`;
+};
+
+/**
+ * Udostępnia lub zapisuje PDF przez natywny Share Sheet
+ * @param pdfUri URI pliku PDF
+ * @param filename Nazwa pliku (opcjonalna)
+ */
+export const shareOrSavePDF = async (
+  pdfUri: string,
+  filename: string = 'pomiary-okien.pdf'
+): Promise<void> => {
+  try {
+    // Sprawdź czy sharing jest dostępny
+    const isAvailable = await Sharing.isAvailableAsync();
+
+    if (!isAvailable) {
+      Alert.alert(
+        'Błąd',
+        'Udostępnianie plików nie jest dostępne na tym urządzeniu'
+      );
+      return;
+    }
+
+    // Udostępnij PDF przez natywny Share Sheet
+    // Użytkownik będzie mógł wybrać gdzie zapisać (Files, Drive, etc.)
+    await Sharing.shareAsync(pdfUri, {
+      mimeType: 'application/pdf',
+      dialogTitle: 'Zapisz lub udostępnij PDF',
+      UTI: 'com.adobe.pdf',
+    });
+
+    console.log('✅ PDF udostępniony');
+  } catch (error) {
+    console.error('❌ Błąd podczas udostępniania PDF:', error);
+    throw new Error('Nie udało się udostępnić PDF');
+  }
+};
+
+/**
+ * Wysyła PDF przez email
+ * @param pdfUri URI pliku PDF
+ * @param filename Nazwa pliku
+ * @param measurementName Nazwa pomiaru (do tematu i treści)
+ */
+export const sendPDFByEmail = async (
+  pdfUri: string,
+  filename: string,
+  measurementName: string
+): Promise<void> => {
+  try {
+    // Sprawdź czy mail composer jest dostępny
+    const isAvailable = await MailComposer.isAvailableAsync();
+
+    if (!isAvailable) {
+      Alert.alert(
+        'Błąd',
+        'Wysyłanie e-mail nie jest dostępne na tym urządzeniu. Upewnij się, że masz skonfigurowane konto email.'
+      );
+      return;
+    }
+
+    // Otwórz composer z załączonym PDF
+    const result = await MailComposer.composeAsync({
+      subject: `Pomiar okna: ${measurementName}`,
+      body: `W załączniku znajduje się pomiar okna "${measurementName}".\n\nWygenerowano automatycznie przez aplikację Pomiary Okien.`,
+      attachments: [pdfUri],
+    });
+
+    if (result.status === 'sent') {
+      console.log('✅ Email wysłany');
+      Alert.alert('Sukces', 'Email został wysłany');
+    } else if (result.status === 'cancelled') {
+      console.log('ℹ️ Wysyłanie emaila anulowane');
+    } else {
+      console.log('ℹ️ Email zapisany jako wersja robocza');
+    }
+  } catch (error) {
+    console.error('❌ Błąd podczas wysyłania emaila:', error);
+    throw new Error('Nie udało się wysłać emaila');
+  }
 };

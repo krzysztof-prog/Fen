@@ -33,83 +33,41 @@ const JPEG_QUALITY = 0.8;
 export const compressImage = async (uri: string): Promise<ImageInfo> => {
   try {
     console.log('🖼️ Rozpoczynam kompresję zdjęcia:', uri);
-    
-    // Pobierz informacje o oryginalnym pliku
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    const originalSize = fileInfo.size || 0;
-    
-    console.log(`📊 Oryginalny rozmiar: ${(originalSize / 1024 / 1024).toFixed(2)} MB`);
-    
-    // Sprawdź czy plik nie jest już wystarczająco mały
-    if (originalSize <= VALIDATION.photos.maxSizeBytes) {
-      // Pobierz wymiary bez kompresji
-      const result = await manipulateAsync(uri, [], {
-        compress: JPEG_QUALITY,
-        format: SaveFormat.JPEG,
-      });
-      
-      const info = await FileSystem.getInfoAsync(result.uri);
-      
-      return {
-        uri: result.uri,
-        width: result.width,
-        height: result.height,
-        size: info.size || 0,
-      };
-    }
-    
-    // Przeskaluj jeśli za duże
-    let width = 0;
-    let height = 0;
-    
-    // Najpierw pobierz wymiary
-    const tempResult = await manipulateAsync(uri, []);
-    width = tempResult.width;
-    height = tempResult.height;
-    
-    console.log(`📐 Oryginalne wymiary: ${width}x${height}`);
-    
-    // Oblicz nowe wymiary zachowując proporcje
-    let newWidth = width;
-    let newHeight = height;
-    
-    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-      if (width > height) {
-        newWidth = MAX_DIMENSION;
-        newHeight = Math.round((height / width) * MAX_DIMENSION);
-      } else {
-        newHeight = MAX_DIMENSION;
-        newWidth = Math.round((width / height) * MAX_DIMENSION);
-      }
-      console.log(`📏 Nowe wymiary: ${newWidth}x${newHeight}`);
-    }
-    
-    // Kompresuj i przeskaluj
+
+    // Zawsze wykonaj kompresję - manipulateAsync automatycznie dostosuje rozmiar
     const result = await manipulateAsync(
       uri,
-      [{ resize: { width: newWidth, height: newHeight } }],
+      [{ resize: { width: MAX_DIMENSION } }], // Automatycznie zachowa proporcje
       {
         compress: JPEG_QUALITY,
         format: SaveFormat.JPEG,
       }
     );
-    
-    // Pobierz rozmiar skompresowanego pliku
-    const compressedInfo = await FileSystem.getInfoAsync(result.uri);
-    const compressedSize = compressedInfo.size || 0;
-    
-    console.log(`✅ Skompresowany rozmiar: ${(compressedSize / 1024 / 1024).toFixed(2)} MB`);
-    console.log(`💾 Zaoszczędzono: ${((originalSize - compressedSize) / 1024 / 1024).toFixed(2)} MB`);
-    
+
+    console.log(`📐 Skompresowane wymiary: ${result.width}x${result.height}`);
+
+    // Spróbuj pobrać rozmiar pliku (może nie być dostępny dla wszystkich URI)
+    let size = 0;
+    try {
+      const info = await FileSystem.getInfoAsync(result.uri);
+      if (info.exists && 'size' in info) {
+        size = info.size;
+        console.log(`✅ Rozmiar po kompresji: ${formatFileSize(size)}`);
+      }
+    } catch (err) {
+      console.log('⚠️ Nie można pobrać rozmiaru pliku (to normalne dla niektórych URI)');
+    }
+
     return {
       uri: result.uri,
       width: result.width,
       height: result.height,
-      size: compressedSize,
+      size: size,
     };
   } catch (error) {
     console.error('❌ Błąd podczas kompresji zdjęcia:', error);
-    throw new Error('Nie udało się skompresować zdjęcia');
+    console.error('Szczegóły błędu:', JSON.stringify(error, null, 2));
+    throw error; // Rzuć oryginalny błąd, żeby zobaczyć dokładny komunikat
   }
 };
 
@@ -172,7 +130,8 @@ export const generateThumbnail = async (
 export const validateFileSize = async (uri: string): Promise<boolean> => {
   try {
     const info = await FileSystem.getInfoAsync(uri);
-    return (info.size || 0) <= VALIDATION.photos.maxSizeBytes;
+    const size = (info.exists && 'size' in info) ? info.size : 0;
+    return size <= VALIDATION.photos.maxSizeBytes;
   } catch (error) {
     console.error('❌ Błąd podczas sprawdzania rozmiaru pliku:', error);
     return false;

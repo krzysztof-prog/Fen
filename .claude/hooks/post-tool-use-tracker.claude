@@ -1,0 +1,1 @@
+log("Skill used: {skill_name} in file {file_path}")

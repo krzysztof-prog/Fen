@@ -1,6 +1,0 @@
-if file in ["app/**", "components/**", "constants/**"]:
-    activate("react-native-ui-helper")
-elif file in ["database/**", "utils/**"]:
-    activate("backend-analyzer")
-elif "production" in file.lower() or "orders" in file.lower():
-    activate("pvc-production-optimizer")
